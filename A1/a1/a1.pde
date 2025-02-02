@@ -5,7 +5,7 @@ float noiseYBias = 1.00;
 int numOctaves = 5;
 float threshold = 0.225;
 float octaveBase = 2.4;
-boolean shouldThreshold = false;
+boolean shouldThreshold = true;
 int peakOctaveLimit = 2;
 
 int IX(int x, int y) { return y * width + x; }
@@ -47,18 +47,62 @@ void draw()
 {
   loadPixels();
   // shard pieces
-  //generateShardNoise(5, 0.005, 0.25, 1.00, 0.225, 2.4, 2, 1337);
+  generateShardNoise(5, 0.005, 0.25, 1.00, 0.225, 2.4, 2, 1337);
   
   // large cracks
   //generateShardNoise(5, 0.003, 0.4, 12.05, 0.375, 2.4, -1, 1337);
   
+  
+  float[][] edgeKernel = {
+    {-1, -1, -1},
+    {-1,  8, -1},
+    {-1, -1, -1}
+  };
+  
+  float[][] XedgeKernel = {
+    {-1, 0, 1},
+    {-2, 0, 2},
+    {-1, 0, 1}
+  };
   // small cracks texture
-  generateShardNoise(5, 0.003, 0.4, 12.05, 0.375, 2.4, -1, 1337);
-  invertColors(pixels);
+  int[] result = new int[pixels.length];
+  //generateShardNoise(5, 0.03, 0.4, 12.05, 0.375, 2.4, -1, 1337);
+  //invertColors(pixels);
+  applyConvolution(pixels, edgeKernel, result);
+  arrayCopy(result, pixels);
   updatePixels();
 }
 
 /* UTILS */
+
+void applyConvolution(int[] pixelArray, float[][] kernel, int[] result) {
+  int w = width, h = height;
+  //int[] result = new int[pixels.length];
+
+  int kw = kernel.length, kh = kernel[0].length;
+  int kCenterX = kw / 2, kCenterY = kh / 2;
+
+  for (int y = kCenterY; y < h - kCenterY; y++) {
+    for (int x = kCenterX; x < w - kCenterX; x++) {
+      float r = 0, g = 0, b = 0;
+      for (int ky = 0; ky < kh; ky++) {
+        for (int kx = 0; kx < kw; kx++) {
+          int px = (x + kx - kCenterX) + (y + ky - kCenterY) * w;
+          color col = pixelArray[px];
+          float weight = kernel[ky][kx];
+          r += red(col) * weight;
+          g += green(col) * weight;
+          b += blue(col) * weight;
+        }
+      }
+      int i = x + y * w;
+      result[i] = color(constrain(r, 0, 255), constrain(g, 0, 255), constrain(b, 0, 255));
+    }
+  }
+
+  //arrayCopy(result, pixels);
+  //updatePixels();
+}
 
 void invertColors(int[] pixelArray) {
   for (int i = 0; i < pixelArray.length; i++) {
