@@ -67,7 +67,7 @@ void draw()
   Arrays.fill(pixels, color(0, 0, 0));
   updatePixels();
   loadPixels();
-  for(int layer = 0; layer < 10; layer++) {
+  for(int layer = 0; layer < 15; layer++) {
 
   int[] shardEdges = new int[pixels.length];
   Arrays.fill(shardEdges, color(0, 0, 0));
@@ -103,14 +103,14 @@ void draw()
   //jitterEdges(shardEdges, smallCrackTexture, edgeJitter);
   maskLayer(shards, baseColor, texturedShards);
   //maskLayer(shards, largeCrackTexture, texturedShards);
-  maskLayer(shards, smallCrackTexture, texturedShards);
+  //maskLayer(shards, smallCrackTexture, texturedShards);
   
   applyConvolution(shards, edgeKernel, shardEdges);
 
 
   
   //maskLayer(shards, baseColor, pixels);
-  addBlend(pixels, shardEdges);
+  //addBlend(pixels, shardEdges);
   addBlend(pixels, texturedShards);
   }
 
