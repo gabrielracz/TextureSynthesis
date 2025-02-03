@@ -60,6 +60,40 @@ void generateShardNoise(int[] arr, int nOctaves, float scale, float xBias, float
   }
 }
 
+void generateSpecularNoise(int[] arr, int nOctaves, float scale, int seed) {
+  for (int y = 0; y < height; y++) {
+    for (int x = 0; x < width; x++) {
+      float accum = 0.0;
+      float noiseSum = 0.0;
+      float maxWeight = 0.0;
+
+      // Layered noise for cloudy background
+      for (int o = 0; o < nOctaves; o++) {
+        float freq = pow(2, o) * scale * 4;
+        //float weight = pow(2, -o);
+        float weight = 1.0;
+        float n = OpenSimplex2S.noise2(seed, x * freq, y * freq);
+        noiseSum += weight * n;
+        maxWeight += weight;
+      }
+      
+      // Normalize noise
+      noiseSum /= maxWeight;
+      float baseIntensity = map(noiseSum, -1.0, 1.0, 20, 150); // Cloudy background
+
+      // Add sharp stars with high contrast
+      float grain = OpenSimplex2S.noise2(seed + 100, x * scale * 8, y * scale * 8);
+      if (grain > 0.7) {
+        baseIntensity = 255; // Very bright star points
+      } else if (grain > 0.4) {
+        baseIntensity = map(grain, 0.7, 0.85, baseIntensity, 255); // Mid-intensity stars
+      }
+
+      arr[IX(x, y)] = color(baseIntensity);
+    }
+  }
+}
+
 void draw()
 {
   
@@ -69,23 +103,32 @@ void draw()
   Arrays.fill(pixels, color(0, 0, 0));
   updatePixels();
   loadPixels();
-  
+   
+  int[] staging = new int[pixels.length];
   int[] shards = new int[pixels.length]; 
   int[] shardEdges = new int[pixels.length];
   int[] shardGradients = new int[pixels.length];
   int[] smallCrackTexture = new int[pixels.length];
+  int[] smallCrackTextureAcross = new int[pixels.length];
   int[] largeCrackTexture = new int[pixels.length];
   int[] rotatedShards = new int[pixels.length]; 
   int[] rotatedCracks = new int[pixels.length]; 
   int[] texturedShards = new int[pixels.length];
   int[] baseColor = new int[pixels.length];
-  Arrays.fill(baseColor, color(81, 75, 63));
+  int[] edgeColor = new int[pixels.length];
+
+  int[] backgroundNoise = new int[pixels.length];
+
+  //Arrays.fill(baseColor, color(81, 75, 63));
+  Arrays.fill(baseColor, color(93, 89, 78));
+  Arrays.fill(edgeColor, color(245, 246, 232));
   
-  int numLayers = 20;
+  int numLayers = 15;
   for(int layer = 0; layer < numLayers; layer++) {
     Arrays.fill(shardEdges, color(0, 0, 0));
     Arrays.fill(shardGradients, color(0, 0, 0));
     Arrays.fill(smallCrackTexture, color(0, 0, 0));
+    Arrays.fill(smallCrackTextureAcross, color(0, 0, 0));
     Arrays.fill(largeCrackTexture, color(0, 0, 0)); 
     Arrays.fill(rotatedCracks, color(0, 0, 0)); 
     Arrays.fill(texturedShards, color(0, 0, 0));
@@ -103,29 +146,48 @@ void draw()
     invertColors(largeCrackTexture);
   
     // small cracks texture
-    generateShardNoise(smallCrackTexture, 5, 0.03, 0.4, 9.05, 0.0, 2.4, -1, int(random(100000000)));
+    generateShardNoise(smallCrackTexture, 5, 0.03, 0.4, 7.05, 0.0, 2.4, -1, int(random(100000000)));
     invertColors(smallCrackTexture);
     
+    generateShardNoise(staging, 5, 0.03, 9.05, 0.4, 0.45, 2.4, -1, int(random(100000000)));
+    invertColors(staging);
+    rotateImage(staging, smallCrackTextureAcross, random(-PI/6, PI/6)); 
+    
     // combine cracks into ont texture
-    addBlend(largeCrackTexture, smallCrackTexture, 0.5);
+    addBlend(largeCrackTexture, smallCrackTexture, 0.4);
+    addBlend(largeCrackTexture, smallCrackTextureAcross, 0.4);
 
     // apply texture to inside of shards
     maskLayer(shards, baseColor, texturedShards, 1.0);
-    maskLayer(shards, largeCrackTexture, texturedShards, 0.3);
+    maskLayer(shards, largeCrackTexture, texturedShards, 0.8);
     
     // apply jitter edges to shard texture
-    jitterEdges(shardGradients, baseColor, shardEdges);
+    jitterEdges(shardGradients, edgeColor, shardEdges);
     addBlend(texturedShards, shardEdges, 1.0);
     
     // ROTATE SHARDS
     rotateImage(texturedShards, rotatedShards, rotation);
+    
 
     float alpha = 1.0 * ((1.0/(numLayers*1.5)) * (layer + 1));
-    addBlend(pixels, rotatedShards, alpha);
+    //addBlend(pixels, rotatedShards, alpha);
+    // mask out areas that already have many shards to avoid too much overlap
+    arrayCopy(pixels, staging);
+    invertColors(staging);
+    maskLayer(staging, rotatedShards, pixels, alpha, 0.8);
+    
+
+
+    //arrayCopy(staging, pixels);
     println("Layer:", layer+1);
     
     //arrayCopy(shardEdges, pixels);
   }
+  
+  arrayCopy(pixels, staging);
+  invertColors(staging);  
+  generateSpecularNoise(backgroundNoise, 4, 0.01, int(random(1000000)));
+  maskLayer(staging, backgroundNoise, pixels, 0.2);
   updatePixels();
   println("DONE\n");
 }
@@ -146,8 +208,10 @@ void jitterEdges(int[] input, int[] layer, int[] output) {
       if(red(sample) != 127) {
 
         //int r = int(random(15) + 1);
-        float maxJitter = 15.0;
-        int r = int(abs(OpenSimplex2S.noise2(seed, noiseX, y*0.1)) * maxJitter);
+        float maxJitter = 8.0;
+        float noise = -1 * abs(OpenSimplex2S.noise2(seed, noiseX, y*0.1)) + 1;
+        int r = int(noise * maxJitter);
+        if(r < maxJitter/2) r = 0;
         // jitter inwards towards the shard contents
         if(red(sample) < 127) {
           start = -r;
@@ -237,7 +301,18 @@ void maskLayer(int[] mask, int[] layer, int[] output, float alpha) {
   for(int y = 0; y < height; y++) {
     for(int x = 0; x < width; x++) {
       int i = IX(x, y);
-      if(mask[i] != color(0, 0, 0)) {
+      if(mask[i] == color(255)) {
+        output[i] = addColors(output[i], layer[i], 1.0, alpha);
+      }
+    }
+  }
+}
+
+void maskLayer(int[] mask, int[] layer, int[] output, float alpha, float maskIntensity) {
+  for(int y = 0; y < height; y++) {
+    for(int x = 0; x < width; x++) {
+      int i = IX(x, y);
+      if(mask[i] > color(255 * maskIntensity)) {
         output[i] = addColors(output[i], layer[i], 1.0, alpha);
       }
     }
