@@ -30,8 +30,7 @@ OpenSimplex2S noiseGen;
 void setup()
 {
   size(800, 800);
-  noiseGen = new OpenSimplex2S();
-  //noLoop();
+  noLoop();
 }
 
 void generateShardNoise(int[] arr, int nOctaves, float scale, float xBias, float yBias, float threshold, float amplitudeBase, int peakOctaves, long seed) {
@@ -44,7 +43,7 @@ void generateShardNoise(int[] arr, int nOctaves, float scale, float xBias, float
         float xscale = (o > peakOctaves) ? xBias : 1;
         float n = OpenSimplex2S.noise2(seed,
                                        x * pow(2, o) * scale * xscale + offset,
-                                       y * pow(2, o) * scale * yBias + offset);              
+                                       y * pow(2, o) * scale * yBias + offset);      
         float intensity;
         if( o <= peakOctaves) intensity = map(n, -1.0, 1.0, 0.0, 255.0);
         else intensity = abs(n) * 255.0;
@@ -123,7 +122,7 @@ void draw()
   Arrays.fill(baseColor, color(93, 89, 78));
   Arrays.fill(edgeColor, color(245, 246, 232));
   
-  int numLayers = 15;
+  int numLayers = 2;
   for(int layer = 0; layer < numLayers; layer++) {
     Arrays.fill(shardEdges, color(0, 0, 0));
     Arrays.fill(shardGradients, color(0, 0, 0));
@@ -152,22 +151,26 @@ void draw()
     generateShardNoise(staging, 5, 0.03, 9.05, 0.4, 0.45, 2.4, -1, int(random(100000000)));
     invertColors(staging);
     rotateImage(staging, smallCrackTextureAcross, random(-PI/6, PI/6)); 
+
     
     // combine cracks into ont texture
     addBlend(largeCrackTexture, smallCrackTexture, 0.4);
     addBlend(largeCrackTexture, smallCrackTextureAcross, 0.4);
 
+        
     // apply texture to inside of shards
     maskLayer(shards, baseColor, texturedShards, 1.0);
     maskLayer(shards, largeCrackTexture, texturedShards, 0.8);
+
+
     
     // apply jitter edges to shard texture
     jitterEdges(shardGradients, edgeColor, shardEdges);
     addBlend(texturedShards, shardEdges, 1.0);
+
     
     // ROTATE SHARDS
-    rotateImage(texturedShards, rotatedShards, rotation);
-    
+    rotateImage(texturedShards, rotatedShards, rotation); 
 
     float alpha = 1.0 * ((1.0/(numLayers*1.5)) * (layer + 1));
     //addBlend(pixels, rotatedShards, alpha);
@@ -175,6 +178,7 @@ void draw()
     arrayCopy(pixels, staging);
     invertColors(staging);
     maskLayer(staging, rotatedShards, pixels, alpha, 0.8);
+
     
 
 
@@ -183,6 +187,9 @@ void draw()
     
     //arrayCopy(shardEdges, pixels);
   }
+    arrayCopy(staging, pixels);
+    updatePixels();
+  if(true) return;
   
   arrayCopy(pixels, staging);
   invertColors(staging);  
