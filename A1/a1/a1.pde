@@ -8,20 +8,8 @@ int numOctaves = 5;
 float threshold = 0.225;
 float octaveBase = 2.4;
 boolean shouldThreshold = true;
+boolean binaryThreshold = true;
 int peakOctaveLimit = 2;
-
-  
-float[][] edgeKernel = {
-  {-1, -1, -1},
-  {-1,  8, -1},
-  {-1, -1, -1}
-};
-  
-float[][] XedgeKernel = {
-  {-1, 0, 1},
-  {-2, 0, 2},
-  {-1, 0, 1}
-};
 
 int IX(int x, int y) { return y * width + x; }
 
@@ -30,7 +18,6 @@ OpenSimplex2S noiseGen;
 void setup()
 {
   size(800, 800);
-  noLoop();
 }
 
 void generateShardNoise(int[] arr, int nOctaves, float scale, float xBias, float yBias, float threshold, float amplitudeBase, int peakOctaves, long seed) {
@@ -52,7 +39,11 @@ void generateShardNoise(int[] arr, int nOctaves, float scale, float xBias, float
       float finalIntensity = accum;
       //if(shouldThreshold) {
       if(threshold > 0.0) {
-        finalIntensity = (accum < (threshold * 255.0)) ? 255.0 : 0.0;
+        if((accum < (threshold * 255.0))) {
+          finalIntensity = (binaryThreshold) ? 255.0 : accum;
+        } else {
+          finalIntensity = 0.0;      
+        }
       }
       arr[IX(x, y)] = color(finalIntensity);
     }
@@ -64,28 +55,22 @@ void generateSpecularNoise(int[] arr, int nOctaves, float scale, int seed) {
     for (int x = 0; x < width; x++) {
       float accum = 0.0;
       float noiseSum = 0.0;
-      float maxWeight = 0.0;
 
-      // Layered noise for cloudy background
       for (int o = 0; o < nOctaves; o++) {
         float freq = pow(2, o) * scale * 4;
-        //float weight = pow(2, -o);
         float weight = 1.0;
         float n = OpenSimplex2S.noise2(seed, x * freq, y * freq);
         noiseSum += weight * n;
-        maxWeight += weight;
       }
       
-      // Normalize noise
-      noiseSum /= maxWeight;
       float baseIntensity = map(noiseSum, -1.0, 1.0, 20, 150); // Cloudy background
 
       // Add sharp stars with high contrast
       float grain = OpenSimplex2S.noise2(seed + 100, x * scale * 8, y * scale * 8);
       if (grain > 0.7) {
-        baseIntensity = 255; // Very bright star points
+        baseIntensity = 255; // bright
       } else if (grain > 0.4) {
-        baseIntensity = map(grain, 0.7, 0.85, baseIntensity, 255); // Mid-intensity stars
+        baseIntensity = map(grain, 0.7, 0.85, baseIntensity, 255); // Mid-intensity
       }
 
       arr[IX(x, y)] = color(baseIntensity);
@@ -96,9 +81,7 @@ void generateSpecularNoise(int[] arr, int nOctaves, float scale, int seed) {
 void draw()
 {
   
-  
   loadPixels();
-  // shard pieces
   Arrays.fill(pixels, color(0, 0, 0));
   updatePixels();
   loadPixels();
@@ -122,7 +105,7 @@ void draw()
   Arrays.fill(baseColor, color(93, 89, 78));
   Arrays.fill(edgeColor, color(245, 246, 232));
   
-  int numLayers = 2;
+  int numLayers = 21;
   for(int layer = 0; layer < numLayers; layer++) {
     Arrays.fill(shardEdges, color(0, 0, 0));
     Arrays.fill(shardGradients, color(0, 0, 0));
@@ -141,60 +124,51 @@ void draw()
     
     // SHARD TEXTURE
     // large cracks
-    generateShardNoise(largeCrackTexture, 5, 0.0085, 0.4, 12.05, 0.375, 2.4, -1, int(random(100000000)));
+    generateShardNoise(largeCrackTexture, 5, 0.0085, 0.4, 12.05, 0.385, 2.4, -1, int(random(100000000)));
     invertColors(largeCrackTexture);
   
     // small cracks texture
-    generateShardNoise(smallCrackTexture, 5, 0.03, 0.4, 7.05, 0.0, 2.4, -1, int(random(100000000)));
-    invertColors(smallCrackTexture);
-    
+    binaryThreshold = false;
+    generateShardNoise(smallCrackTexture, 5, 0.03, 0.4, 7.05, 0.3, 2.4, -1, int(random(100000000)));
+    binaryThreshold = true;
+    //invertColors(smallCrackTexture);
+
     generateShardNoise(staging, 5, 0.03, 9.05, 0.4, 0.45, 2.4, -1, int(random(100000000)));
     invertColors(staging);
     rotateImage(staging, smallCrackTextureAcross, random(-PI/6, PI/6)); 
 
     
     // combine cracks into ont texture
-    addBlend(largeCrackTexture, smallCrackTexture, 0.4);
-    addBlend(largeCrackTexture, smallCrackTextureAcross, 0.4);
+    addBlend(largeCrackTexture, smallCrackTexture, 0.7);
+    addBlend(largeCrackTexture, smallCrackTextureAcross, 0.5);
 
         
     // apply texture to inside of shards
     maskLayer(shards, baseColor, texturedShards, 1.0);
-    maskLayer(shards, largeCrackTexture, texturedShards, 0.8);
-
-
+    maskLayer(shards, largeCrackTexture, texturedShards, 1.75);
     
     // apply jitter edges to shard texture
     jitterEdges(shardGradients, edgeColor, shardEdges);
-    addBlend(texturedShards, shardEdges, 1.0);
-
+    addBlend(texturedShards, shardEdges, 1.7);
     
     // ROTATE SHARDS
     rotateImage(texturedShards, rotatedShards, rotation); 
 
     float alpha = 1.0 * ((1.0/(numLayers*1.5)) * (layer + 1));
-    //addBlend(pixels, rotatedShards, alpha);
     // mask out areas that already have many shards to avoid too much overlap
     arrayCopy(pixels, staging);
     invertColors(staging);
     maskLayer(staging, rotatedShards, pixels, alpha, 0.8);
 
-    
-
-
-    //arrayCopy(staging, pixels);
     println("Layer:", layer+1);
     
-    //arrayCopy(shardEdges, pixels);
   }
-    arrayCopy(staging, pixels);
-    updatePixels();
-  if(true) return;
   
   arrayCopy(pixels, staging);
   invertColors(staging);  
   generateSpecularNoise(backgroundNoise, 4, 0.01, int(random(1000000)));
-  maskLayer(staging, backgroundNoise, pixels, 0.2);
+  maskLayer(staging, backgroundNoise, pixels, 0.1);
+  
   updatePixels();
   println("DONE\n");
 }
@@ -207,18 +181,13 @@ void jitterEdges(int[] input, int[] layer, int[] output) {
   for(int y = 10; y < height-1; y++) {
     for(int x = 10; x < width-1; x++) {
       color sample = input[IX(x, y)];
-      //if(input[IX(x, y)] != color(0, 0, 0)) {
-      //println(red(sample));
       
       int start;
       int end;
       if(red(sample) != 127) {
-
-        //int r = int(random(15) + 1);
-        float maxJitter = 8.0;
-        float noise = -1 * abs(OpenSimplex2S.noise2(seed, noiseX, y*0.1)) + 1;
+        float maxJitter = 15.0;
+        float noise = -1 * abs(OpenSimplex2S.noise2(seed, noiseX, y*0.1)) + 0.5; // only partial shift
         int r = int(noise * maxJitter);
-        if(r < maxJitter/2) r = 0;
         // jitter inwards towards the shard contents
         if(red(sample) < 127) {
           start = -r;
@@ -240,8 +209,6 @@ void jitterEdges(int[] input, int[] layer, int[] output) {
 
 void applyConvolution(int[] pixelArray, float[][] kernel, int[] result) {
   int w = width, h = height;
-  //int[] result = new int[pixels.length];
-
   int kw = kernel.length, kh = kernel[0].length;
   int kCenterX = kw / 2, kCenterY = kh / 2;
 
@@ -262,9 +229,6 @@ void applyConvolution(int[] pixelArray, float[][] kernel, int[] result) {
       result[i] = color(constrain(r, 0, 255), constrain(g, 0, 255), constrain(b, 0, 255));
     }
   }
-
-  //arrayCopy(result, pixels);
-  //updatePixels();
 }
 
 void applySobelGradient(int[] input, int[] result) {
@@ -289,17 +253,17 @@ void applySobelGradient(int[] input, int[] result) {
       for (int ky = -1; ky <= 1; ky++) {
         for (int kx = -1; kx <= 1; kx++) {
           int px = (x + kx) + (y + ky) * w;
-          float intensity = brightness(input[px]); // Since image is B&W, we can use brightness
+          float intensity = brightness(input[px]);
 
           gx += intensity * sobelX[ky + 1][kx + 1];
           gy += intensity * sobelY[ky + 1][kx + 1];
         }
       }
 
-      // Map gradients to 0-255 range
-      int r = int(map(gx, -255, 255, 0, 255)); // Store Gx in red channel
-      int b = int(map(gy, -255, 255, 0, 255)); // Store Gy in green channel
-      result[x + y * w] = color(r, 0, b); // Red = Gx, Green = Gy, Blue = 0
+      // map gradients to 0-255 range
+      int r = int(map(gx, -255, 255, 0, 255));
+      int b = int(map(gy, -255, 255, 0, 255));
+      result[x + y * w] = color(r, 0, b);
     }
   }
 }
@@ -361,19 +325,17 @@ void rotateImage(int[] input, int[] output, float angle) {
 
   for (int y = 0; y < width; y++) {
     for (int x = 0; x < height; x++) {
-      // Map (x, y) to centered coordinates
       float nx = x - cx;
       float ny = y - cy;
 
-      // Apply inverse rotation
+      // apply inverse rotation
       int srcX = round(cx + (nx * cosA - ny * sinA));
       int srcY = round(cy + (nx * sinA + ny * cosA));
 
-      // Bounds check
       if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
         output[IX(x, y)] = input[IX(srcX, srcY)];
       } else {
-        output[IX(x, y)] = color(0); // Fill with black if out of bounds
+        output[IX(x, y)] = color(0); // fill with black if out of bounds
       }
     }
   }
