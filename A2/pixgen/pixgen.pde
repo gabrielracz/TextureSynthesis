@@ -4,12 +4,12 @@ PImage exampleImg;
 color[] outputArr;
 int outWidth, outHeight;
 
-float ErrorThreshold = 0.1;
-int MonteCarloSamples = 400;
+float ErrorThreshold = 30.0;
+int MonteCarloSamples = 100;
 
 color[] candidateMatches;
-int kernelSize = 11;
-float sigma = float(kernelSize) / 6.0; 
+int kernelSize = 15;
+float sigma = float(kernelSize) / 6.4; 
 float[] gaussianWeights = generateGaussianKernel(kernelSize, sigma);
 boolean[] dummyValidMask;
 
@@ -24,6 +24,16 @@ class Pair {
   Pair(int x, int y) {
     this.x = x;
     this.y = y;
+  }
+}
+
+class ScoredColor {
+  color col;
+  float score;
+  
+  ScoredColor(color col, float score) {
+    this.col = col;
+    this.score = score;
   }
 }
 
@@ -70,8 +80,8 @@ float computeSimilarity(int exX, int exY, float[] weights, boolean[] validMask, 
       //float v = (validMask[i * kernelSize + j]) ? 1.0 : 0.0;
       //float v = (cmp == INVALID_COLOR) ? 0.0 : 1.0;
 
-      //float result = d * w;
-      float result = d;
+      float result = d * w;
+      //float result = d;
       
       accumScore += result;
       weightSum += w;
@@ -84,17 +94,27 @@ color findClosestMatch(int outX, int outY) {
   int k = kernelSize / 2;
   Arrays.fill(candidateMatches, INVALID_COLOR);
   int matches = 0;
+  float lowestScore = 10000000.0;
+  color closestColor = INVALID_COLOR;
   for(int y = k; y < exampleImg.height - k; y++) {
     for(int x = k; x < exampleImg.width - k; x++) {
       float score = computeSimilarity(x, y, gaussianWeights, dummyValidMask, outX, outY);
-      if(score < ErrorThreshold) {
-        candidateMatches[matches] = exampleImg.pixels[y * exampleImg.width + x];
-        matches++;
+      //if(score < ErrorThreshold) {
+      //  scoredColors[matches] = new ScoredColor(exampleImg.pixels[y * exampleImg.width + x], score);
+      //  matches++;
+      //}
+      score += random(ErrorThreshold); //randomly jitter score to introduce variance
+      if(score < lowestScore) {
+        lowestScore = score;
+        closestColor = exampleImg.pixels[y * exampleImg.width + x];
       }
     }
   }
-  color randPick = candidateMatches[floor(random(matches))];
-  return randPick;
+  //if(matches == 0) println("NO MATCHES", lowestScore);
+  
+  //color randPick = candidateMatches[floor(random(matches))];
+  //return randPick;
+  return closestColor;
 }
 
 color findClosestMatchMonte(int outX, int outY, int numTries) {
@@ -126,7 +146,8 @@ void initializeTextureSingleCornerPixel(int k) {
 void iterateFillTopLeft(int k) {
     for(int y = k + 1; y < outWidth - k; y++) {
     for(int x = k; x < outWidth - k; x++) {
-      color match = findClosestMatchMonte(x, y, MonteCarloSamples);
+      //color match = findClosestMatchMonte(x, y, MonteCarloSamples);
+      color match = findClosestMatch(x, y);
       outputArr[IX(x, y)] = match;
     }
     if(y % 10 == 0) {
@@ -171,13 +192,17 @@ void iterateFillGrowCenter(int centerSize) {
     if(x < xlim) x++;
     if(y < ylim) y++;
     
-    //shufflePairArray(pairs, pairCount);
+    shufflePairArray(pairs, pairCount);
     for(int j = 0; j < pairCount; j++) {
       Pair p = pairs[j];
       //color match = findClosestMatchMonte(p.x, p.y, MonteCarloSamples);
       color match = findClosestMatch(p.x, p.y);
       outputArr[IX(p.x, p.y)] = match;
     }
+    //println("\n");
+    //for(int i = 0; i < pairCount; i++)
+    //  print (pairs[i].x, pairs[i].y, " ");
+    
     Arrays.fill(pairs, 0, pairCount, blankPair);
     pairCount = 0;
     if((x + y) % 20 == 0) {
@@ -191,8 +216,8 @@ void generateTexture() {
   //initializeTextureSingleCornerPixel(k);
   //iterateFillTopLeft(k);
   
-  initializeTextureCenterPatch(12);
-  iterateFillGrowCenter(12);
+  initializeTextureCenterPatch(3);
+  iterateFillGrowCenter(3);
 }
 
 void draw() {
