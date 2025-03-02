@@ -4,10 +4,10 @@ PImage exampleImg;
 color[] outputArr;
 int outWidth, outHeight;
 
-int patchSize = 48;
-int patchOverlap = 12;
+int patchSize = 32;
+int patchOverlap = 8;
 color[] samplePatch = new color[patchSize * patchSize];
-int numPatchSamples = 1;
+int numPatchSamples = 1024;
 
 final color INVALID_COLOR = color(0, 0);
 //final float MAX_COLOR_DIST = sqrt(255*255 * 3);
@@ -30,7 +30,7 @@ void setup() {
   exampleImg = loadImage("scales.png");
   exampleImg.loadPixels();
   initOutputArr(winWidth, winHeight);
-  //noLoop();
+  noLoop();
 }
 
 
@@ -98,20 +98,46 @@ CostMap createCostMapHoriz(color[] patch, int outX, int outY) {
   return costMap;
 }
 
-void drawCostMaps(CostMap vcm, CostMap hcm, int outX, int outY) {
+void drawCostMapVert(CostMap vcm, int outX, int outY) {
   for(int y = 0; y < vcm.h; y++) {
     for(int x = 0; x < vcm.w; x++) {
       float cost = vcm.map[y * vcm.w + x];
-      color col = color(cost, cost, cost, 175.0);
-      if (vcm.cuts[y] == x || hcm.cuts[x] == y) {
+      float intensity = cost / MAX_COLOR_DIST;
+      color col = color(intensity * 255.0);
+      if (vcm.cuts[y] == x) {
         col = color(255.0, 0.0, 0.0);
       } else {  
-        continue;
+        //continue;
       }
       outputArr[(y + outY) * outWidth + (x + outX)] = col;
     }
   }
 }
+
+void drawCostMapHoriz(CostMap cm, int outX, int outY) {
+  for(int y = 0; y < cm.w; y++) {
+    for(int x = 0; x < cm.h; x++) {
+      float cost = cm.map[x * cm.w + y];
+      float intensity = cost / MAX_COLOR_DIST;
+      color col = color(intensity * 255.0);
+      if (cm.cuts[x] == y) {
+        col = color(255.0, 0.0, 0.0);
+      } else {  
+        //continue;
+      }
+      outputArr[(y + outY) * outWidth + (x + outX)] = col;
+    }
+  }
+}
+
+float getOverlapCost(CostMap cm) {
+  float sum = 0;
+  for(int i = 0; i < cm.map.length; i++) {
+    sum += cm.map[i]*cm.map[i];
+  }
+  return sum;
+}
+
 
 float minCutCostMap(CostMap cm) {
   // Create a 2D array to store minimum costs
@@ -177,28 +203,28 @@ float minCutCostMap(CostMap cm) {
 
 void drawPatch(color[] patch, CostMap vcm, CostMap hcm, int outX, int outY) {
   for(int py = 0; py < patchSize; py++) {
-    for(int px = vcm.cuts[py] + 1; px < patchSize; px++) {
-      //if(py < hcm.cuts[px]) continue;
+    for(int px = vcm.cuts[py]; px < patchSize; px++) {
+      if(py < hcm.cuts[px]) continue;
       outputArr[(py + outY) * outWidth + (px + outX)] = patch[py * patchSize + px];
     }
   }
 }
 
 void generateTexture() {
-  initializeTextureTopLeft();
+  //initializeTextureTopLeft();
   float lowestCost = Float.MAX_VALUE;
   color[] bestPatch = new color[samplePatch.length];
   CostMap bestVCM = new CostMap(patchSize, patchOverlap);
   CostMap bestHCM = new CostMap(patchSize, patchOverlap);
         
   int patchStep = patchSize - patchOverlap;
-  //int numTilesX = outWidth / (patchStep);
-  //int numTilesY = outHeight / (patchStep);
-  int numTilesX = 6;
-  int numTilesY = 6;
+  int numTilesX = outWidth / (patchStep);
+  int numTilesY = outHeight / (patchStep);
+  //int numTilesX = 6;
+  //int numTilesY = 6;
   
-  for(int ty = 0; ty < numTilesY-1; ty++) {
-    for(int tx = 0; tx < numTilesX; tx++) {
+  for(int ty = 1; ty < numTilesY-1; ty++) {
+    for(int tx = 1; tx < numTilesX-1; tx++) {
       lowestCost = Float.MAX_VALUE;
       for(int i = 0; i < numPatchSamples; i++) {
         getRandomPatch(samplePatch);
@@ -213,11 +239,12 @@ void generateTexture() {
           arrayCopy(costMap.cuts, bestVCM.cuts);
           arrayCopy(costMapHoriz.map, bestHCM.map);
           arrayCopy(costMapHoriz.cuts, bestHCM.cuts);
+          println(totCost, lowestCost);
         }
       }
-      
       drawPatch(bestPatch, bestVCM, bestHCM, tx*patchStep, ty*patchStep);
-      //drawCostMaps(bestVCM, bestHCM, tx*patchStep, ty*patchStep);
+      //drawCostMapVert(bestVCM, tx*patchStep, ty*patchStep);
+      //drawCostMapHoriz(bestHCM, tx*patchStep, ty*patchStep);
     }
   }
 }
