@@ -5,10 +5,10 @@ color[] outputArr;
 int outWidth, outHeight;
 
 float ErrorThreshold = 30.0;
-int MonteCarloSamples = 100;
+int MonteCarloSamples = 300;
 
 color[] candidateMatches;
-int kernelSize = 15;
+int kernelSize = 23;
 float sigma = float(kernelSize) / 6.4; 
 float[] gaussianWeights = generateGaussianKernel(kernelSize, sigma);
 boolean[] dummyValidMask;
@@ -45,18 +45,19 @@ void initOutputArr(int w, int h) {
   Arrays.fill(outputArr, INVALID_COLOR);
 }
 
-int winWidth = 512, winHeight = 512;
+int winWidth = 256, winHeight = 256;
 
 void settings() {
   size(winWidth, winHeight);
 }
 
 void setup() {
-  exampleImg = loadImage("text.png");
+  exampleImg = loadImage("cheese.png");
   exampleImg.loadPixels();
   initOutputArr(winWidth, winHeight);
   candidateMatches = new color[exampleImg.pixels.length];
   noLoop();
+  randomSeed(1337);
 }
 
 float computeSimilarity(int exX, int exY, float[] weights, boolean[] validMask, int outX, int outY) {
@@ -88,6 +89,7 @@ float computeSimilarity(int exX, int exY, float[] weights, boolean[] validMask, 
     }
   }
   return (weightSum > 0.0) ? (accumScore / weightSum) : 0.0; // Normalize
+  //return accumScore; // Normalize
 }
 
 color findClosestMatch(int outX, int outY) {
@@ -146,14 +148,22 @@ void initializeTextureSingleCornerPixel(int k) {
 void iterateFillTopLeft(int k) {
     for(int y = k + 1; y < outWidth - k; y++) {
     for(int x = k; x < outWidth - k; x++) {
-      //color match = findClosestMatchMonte(x, y, MonteCarloSamples);
-      color match = findClosestMatch(x, y);
+      color match = findClosestMatchMonte(x, y, MonteCarloSamples);
+      //color match = findClosestMatch(x, y);
       outputArr[IX(x, y)] = match;
     }
     if(y % 10 == 0) {
         println(y);
     }
   }
+}
+
+void initializeTextureTopLeftPatch(int patchSize) {
+  int p = patchSize;
+  copyRegion(exampleImg.pixels, exampleImg.width, exampleImg.height, 
+             floor(random(p, exampleImg.width - p)), floor(random(p, exampleImg.height - p)),
+             p, p,
+             outputArr, outWidth, outHeight, 0, 0);
 }
 
 void initializeTextureCenterPatch(int centerSize) {
@@ -195,8 +205,8 @@ void iterateFillGrowCenter(int centerSize) {
     shufflePairArray(pairs, pairCount);
     for(int j = 0; j < pairCount; j++) {
       Pair p = pairs[j];
-      //color match = findClosestMatchMonte(p.x, p.y, MonteCarloSamples);
-      color match = findClosestMatch(p.x, p.y);
+      color match = findClosestMatchMonte(p.x, p.y, MonteCarloSamples);
+      //color match = findClosestMatch(p.x, p.y);
       outputArr[IX(p.x, p.y)] = match;
     }
     //println("\n");
@@ -212,12 +222,15 @@ void iterateFillGrowCenter(int centerSize) {
 }
 
 void generateTexture() {
-  //int k = kernelSize / 2;
+  int k = kernelSize / 2;
   //initializeTextureSingleCornerPixel(k);
+  initializeTextureTopLeftPatch(12);
+  iterateFillTopLeft(k);
+  //iterateFillTopLeft(k);
   //iterateFillTopLeft(k);
   
-  initializeTextureCenterPatch(3);
-  iterateFillGrowCenter(3);
+  //initializeTextureCenterPatch(12);
+  //iterateFillGrowCenter(3);
 }
 
 void draw() {

@@ -1,0 +1,88 @@
+INTRO SUMMARY
+uses:
+	segmentation, bilateral filtering, anisotropic diffusion,
+	non-photorealistic rendering, colorization, image stitching, and tone mapping
+
+In general: what is geodesic distance?
+	Distance along a surface, rather than straight line path
+	
+	In the context of images, we consider both the pixel distance as well as the
+	color changes (gradients) required to get there.
+
+	Large pixel distances with constant color can have similar distance to small pixel
+	distances with extreme color changes.
+
+Formula breakdown:
+	Γ (Gamma): pixel path
+	Ι (Iota) : color field
+	Ψ (Psi)  : binary mask
+	Ω (Omega): pixels masked by Ψ (0 for in mask, 1 for outside)
+
+	for each pixel outside of the mask:
+		find its minimum geodesic distance to any pixel inside the mask
+
+	for all possible paths between pixels a, b in the image:
+		for each pixel pair along the path, calculate its cost: (discretize the integral)
+			compare the direction of travel to the direction of color gradient
+			if they align, distance should be high, otherwise distance should be low // dot product
+			(if they are perpendicular, score is 1)S
+	
+implementation:
+	dynamic programming approach
+
+	(i think ak = (x,y) and flipped to be ak = (y,x)
+
+	1. top left to bottom right
+	X X X
+	X X O
+	O O O
+
+	2. bottom right to top left
+	O O O
+	O X X
+	X X X
+
+*   What is the purpose of v in D = vM
+*	Why do we have to perform it twice?
+
+	Distances will be 'v' until we reach a pixel that is contained within the mask, then
+	the min path will begin to be diffuse. The first path only finds the shortest
+	distance to the mask when travelling down and right, has no information about
+	distances to mask when travelling up and left.
+	(if you were only able to travel down or left, what is the min distance)?
+
+GSF Operator:
+	dilate, errode, close/open
+	compute both the errode and dilate masks during the same pass
+
+Edge-Sensitive Smoothing
+
+	Quantize image into k color buckets
+	Compute one mask for each of the k colors
+	Compute GGDT for each mask
+	
+	For each color layer:
+		that color's influence on the output pixel color blend is
+		inversely exponentially proportional to its geodesic distance from that color
+	
+	divide by total sum of weights to avoid increasing overall intensity
+	Figure 18 shows results
+
+
+
+TALKING POINTS
+
+*	How do they compute the probabilistic M soft mask?
+	They take loose artist foreground and background strokes and then??
+	Take the gradient and perform "conventional closing",
+	What could be some strategies to perform this conventional closing?
+
+*	They use manual parameters θ = (θd , θe) to establish maximum size of noise regions.
+	Can you think of some ideas for setting these automatically with no user input?
+
+*	Figure 7 segmentation examples, how does the method segment well with such minimal
+	user strokes? (hint, following section...)
+
+*	What are some cool unmentioned effects that would be possible with the geodesic
+	distance map that are not explored in the paper?
+	(Contour effects, distance based warping, dissolve effects?)

@@ -5,10 +5,10 @@ PImage exampleImg;
 color[] outputArr;
 int outWidth, outHeight;
 
-int patchSize = 48;
+int patchSize = 32;
 int patchOverlap = 12;
 color[] samplePatch = new color[patchSize * patchSize];
-int numPatchSamples = 256;
+int numPatchSamples = 1024;
 
 final color INVALID_COLOR = color(0, 0);
 //final float MAX_COLOR_DIST = sqrt(255*255 * 3);
@@ -22,15 +22,16 @@ void initOutputArr(int w, int h) {
   Arrays.fill(outputArr, INVALID_COLOR);
 }
 
-int winWidth = 512, winHeight = 512;
+int winWidth = 256, winHeight = 256;
 void settings() {
   size(winWidth, winHeight);
 }
 
 void setup() {
-  exampleImg = loadImage("text.png");
+  exampleImg = loadImage("building.png");
   exampleImg.loadPixels();
   initOutputArr(winWidth, winHeight);
+  randomSeed(1337);
   //noLoop();
 }
 
@@ -81,7 +82,7 @@ CostMap createCostMap(color[] patch, int outX, int outY) {
         float cost = 0.0;
         int ix = (y + outY) * outWidth + (x + outX);
         if(ix < outputArr.length) 
-          cost = colorDistance(patch[y * patchSize + x], outputArr[(y + outY) * outWidth + (x + outX)]);
+          cost = colorDistance(patch[y * patchSize + x], outputArr[ix]);
         costMap.map[y * patchOverlap + x] = cost*cost;
       }
     }
@@ -94,7 +95,10 @@ CostMap createCostMapHoriz(color[] patch, int outX, int outY) {
   if(outY > 0) {
     for(int y = 0; y < patchOverlap; y++) {
       for(int x = 0; x < patchSize; x++) {
-        float cost = colorDistance(patch[y * patchSize + x], outputArr[(y + outY) * outWidth + (x + outX)]);
+        float cost = 0.0;
+        int ix = (y + outY) * outWidth + (x + outX);
+        if(ix < outputArr.length) 
+           cost = colorDistance(patch[y * patchSize + x], outputArr[ix]);
         costMap.map[x * patchOverlap + y] = cost*cost;
       }
     }
@@ -210,7 +214,7 @@ void drawPatch(color[] patch, CostMap vcm, CostMap hcm, int outX, int outY) {
     for(int px = vcm.cuts[py]; px < patchSize; px++) {
       if(py < hcm.cuts[px]) continue;
       int ix = (py + outY) * outWidth + (px + outX);
-      if(ix >= outputArr.length) continue;
+      if(ix >= outputArr.length || (px + outX) >= outWidth) continue;
       outputArr[(py + outY) * outWidth + (px + outX)] = patch[py * patchSize + px];
     }
   }
