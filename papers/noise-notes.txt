@@ -1,0 +1,59 @@
+Diffusion Architecture
+	Diffusion Models
+
+	Training Objective
+	E         = expectation, meaning we average this result over many samples
+	𝜖∼N (0,1) = normal distribution noise added to training data
+	𝑡∼U (0,1) = uniform distribution time which says how much noise added to training data
+	∥𝜖 − 𝜖𝜃 (x𝑡 , 𝑡, f𝑐 , f𝑝 )∥2 = minimize the distance between the true noise we added to
+	the data and the predicted noise that the model thinks we added
+
+	We now have a model that can predict how much noise is added to some input that looks
+	like our training data
+
+	Inference
+	1. Initialize completely with random noise
+	2. Use the same model to predict noise added to our yet undetermined lookalike image
+	3. Subtract this prediction from the noise and repeat.
+	4. After many iterations, we will have converged on our model's estimate of what was
+	   "underneath" the pure noise.
+
+U-Net
+	Encoder - takes as input image, compresses spatially, and learns features
+	Bottleneck - where the features are at their most compressed, representing 
+					 the most abstracted understanding of the image
+	Decoder - upsamples features to generate output of same image size
+
+
+Spatially-varying conditioning
+	Conditioning Parameters
+	normalized key-value pairs in [0, 1]:
+		scale
+		distortion
+		noise type (voronoi, cells 4, cells 1)
+
+	MLP
+	takes as input these "human" semanttic parameters, and outputs a feature vector
+	Tile them accross a grid with HEIGHT and WIDTH equal to training image, and
+	depth equal to feature vector length
+	(Denotes high-dimensional feature description at each pixel)
+	Final feature map is interpolated using bilinear interpolation between feature
+	vectors
+
+
+	SPADE	
+	Used instead of normal GroupNorm inbetween U-Net layers.
+	Standard GroupNorm: normalizes activations uniformly accross channels
+	SPADE:	normalizes activation differently based on position of features in image.
+			per pixel:
+			γ(F) = scales amplitude of activation, enhacniang or compressing activations
+			β(F) = shifts bias, shifting entire activation up or down
+
+	CutMix
+	Rather than a single uniform noise input, cut out pieces from many and paste
+	them in, also making sure to include their respective feature vectors
+
+
+Talking Points:
+	Could we use this architecture for textures besides just noise?
+	Tileable textures using circular padding on conv2d layers
