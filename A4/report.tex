@@ -1,0 +1,48 @@
+\documentclass[a4paper, 11pt, titlepage]{article}
+% \usepackage{geometry}
+% \usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{setspace}
+\usepackage{bm}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{graphicx,float}
+\usepackage[export]{adjustbox}
+\usepackage{listings}
+
+\title{COMP5900C\\
+Assignment 4\\
+Reaction Diffusion}
+\author{Gabriel Racz}
+
+\begin{document}
+\maketitle
+\section{Implementation}
+To facilitate real-time tuning of parameters, large output resolutions, and
+interactive placement of chemicals I implemented the reaction diffusion
+simulation system on the GPU using compute shaders. This is due to the uniform
+computation performed accross each discrete grid cell, or pixel in our case. The
+application is built using the Vulkan graphics API, but all of the
+simulation logic is handled within the \texttt{reaction\_diffusion.glsl} and
+\texttt{add\_chemicals.glsl} shaders.
+
+We model the simulation domain using RGBA images. We represent each chemical
+quantity as one color channel of the image. For each step of the simulation, we
+apply our diffusion and reaction operations to the previous image state, and
+save the results to our new image. This seperation of source and destination is
+crucial for ensuring we can safely run our shader updates in parallel. Each
+frame, we swap which image is the source and which is the destination. This
+ensures that the source of each simulation step is the previous step's output.
+
+The first step of each frame is to add/remove chemicals from the domain based on
+user input. We support clearing all chemicals, globally seeding each pixel with a random
+chemical quantity, clearing chemicals in a desired radius around the mouse
+cursor, and adding chemicals in a radius around the mouse cursor. Exactly which
+chemicals are added can be controlled through the GUI as specifying a desired
+color (recall that each of R, G, and B represent a different chemical). This
+interactivity allows designing patterns much better than purely offline
+approaches.
+
+To simulate the reaction diffusion process, 
+\section{Results}
+\end{document}
