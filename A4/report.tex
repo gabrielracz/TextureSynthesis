@@ -43,6 +43,54 @@ color (recall that each of R, G, and B represent a different chemical). This
 interactivity allows designing patterns much better than purely offline
 approaches.
 
-To simulate the reaction diffusion process, 
+To simulate the reaction diffusion process, we dispatch one thread per pixel.
+The diffusion of chemical quantities can be approximated by a discrete Laplacian
+stencil over the source image. For each pixel, we add the quantities of its 4
+direct neighbours, and subtracts 4 times its own chemical. The following GLSL
+function shows this process.
+\begin{verbatim}
+vec4 diffusion(ivec2 index) {
+    vec4 l = imageLoad(srcImg, index + ivec2(-1, 0));
+    vec4 r = imageLoad(srcImg, index + ivec2( 1, 0));
+    vec4 d = imageLoad(srcImg, index + ivec2(0, -1));
+    vec4 u = imageLoad(srcImg, index + ivec2(0,  1));
+    vec4 c = imageLoad(srcImg, index);
+
+    vec4 diff = l + r + d + u - 4.0*c;
+    return diff;
+}
+\end{verbatim}
+
+We combine this blurring of chemicals with a reaction function, which provides
+cross-chemical interactions and emergent behaviour. The reaction function
+outlined in the paper is implemented by the following GLSL function in the
+shader.
+
+\begin{verbatim}
+vec4 reaction(vec4 a, vec4 b, vec4 diff) {
+  return vec4(
+    a + (pc.s*(16 - a*b) + pc.Da*diff.r)*pc.dt,
+    b + (pc.s*(a*b - b - pc.Beta) + pc.Db*diff.g)*pc.dt,
+    0.0,
+    1.0
+  );
+}
+\end{verbatim}
+Here \texttt{pc} is a structure of push constants that can be interactively
+adjusted by the user. It consists of all the parameters outlined in
+Turk's paper.
+
+\begin{verbatim}
+layout(push_constant) uniform PushConstants {
+  float dt;
+  float Da;
+  float Db;
+  float s;
+  float Beta;
+} pc;
+\end{verbatim}
+
+
+
 \section{Results}
 \end{document}
